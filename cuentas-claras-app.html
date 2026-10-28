@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E6B63">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cuentas Claras">
+<title>Cuentas Claras</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+[hidden] { display: none !important; }
+:root { color-scheme: light; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+/* Layout: una columna de 560px. Cabecera fija con el saldo en cuenta, rubros agrupados por grupo y un botón fijo abajo para añadir gastos. */
+:root {
+  --bg: #F1F5F4;
+  --surface: #FFFFFF;
+  --ink: #13211F;
+  --muted: #5B6D6A;
+  --line: #D9E3E1;
+  --accent: #0E6B63;
+  --accent-ink: #FFFFFF;
+  --ok: #2F7D4F;
+  --warn: #B26A00;
+  --bad: #B3261E;
+  --track: #E3ECEA;
+  --overlay: rgba(10, 20, 18, .45);
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1615; --surface: #162120; --ink: #E5EEEC; --muted: #93A8A4; --line: #27403C;
+    --accent: #4FC3B5; --accent-ink: #06211E; --ok: #6CCB8D; --warn: #E3A23B; --bad: #F2796F;
+    --track: #223633; --overlay: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1615; --surface: #162120; --ink: #E5EEEC; --muted: #93A8A4; --line: #27403C;
+  --accent: #4FC3B5; --accent-ink: #06211E; --ok: #6CCB8D; --warn: #E3A23B; --bad: #F2796F;
+  --track: #223633; --overlay: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 112px;
+  font-variant-numeric: tabular-nums;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 560px; margin: 0 auto; }
+
+/* Cabecera fija */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 11; background: var(--bg); padding: 12px 0 10px; border-bottom: 1px solid var(--line); }
+.month { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.month h1 { margin: 0; font: 700 15px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: center; flex: 1; }
+.icon-btn { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-size: 18px; line-height: 1; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.balance { margin-top: 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.balance .lbl { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.balance .num { font: 700 34px/1.05 var(--font-display); letter-spacing: -.02em; }
+.balance .num.neg { color: var(--bad); }
+
+/* Resumen */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 6px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; text-align: left; min-width: 0; }
+.stat .k { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.stat .v { font: 600 15px/1.3 var(--font-body); margin-top: 2px; overflow-wrap: anywhere; }
+button.stat { cursor: pointer; }
+.note { margin: 8px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; background: var(--track); color: var(--ink); }
+.note.bad { color: var(--bad); }
+
+/* Grupos y rubros */
+.group { margin-top: 22px; }
+.g-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.g-head h2 { margin: 0; font: 700 18px/1.2 var(--font-display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.g-head .g-sum { font-size: 13px; color: var(--muted); margin-left: auto; text-align: right; }
+.link { background: none; border: 0; color: var(--accent); font-weight: 600; font-size: 13px; padding: 6px 4px; }
+.rubros { display: grid; gap: 8px; }
+.rubro { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.r-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.r-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.r-name em { font-style: normal; font-weight: 500; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 99px; padding: 1px 7px; margin-left: 8px; white-space: nowrap; }
+.r-left { font-weight: 600; white-space: nowrap; }
+.r-left.neg { color: var(--bad); }
+.bar { display: block; height: 6px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); min-width: 0; }
+.bar i.warn { background: var(--warn); }
+.bar i.bad { background: var(--bad); }
+.r-sub { font-size: 12.5px; color: var(--muted); }
+.add-row { width: 100%; border: 1px dashed var(--line); background: transparent; border-radius: 12px; padding: 10px; color: var(--muted); font-weight: 500; }
+.add-group { margin-top: 22px; width: 100%; }
+
+/* Botón fijo */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 12; padding: 18px max(16px, env(safe-area-inset-left, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, var(--bg) 62%, transparent); pointer-events: none; }
+.dock .btn { pointer-events: auto; display: block; width: 100%; max-width: 560px; margin: 0 auto; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 14px; padding: 15px 18px; font-weight: 600; font-size: 16px; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.btn.small { padding: 9px 14px; font-size: 14px; border-radius: 10px; }
+
+/* Hojas inferiores */
+.overlay { position: fixed; inset: 0; z-index: 30; background: var(--overlay); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 90%; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); border: 1px solid var(--line); border-bottom: 0; }
+.sheet h2 { margin: 0 0 4px; font: 700 21px/1.2 var(--font-display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.sheet .sub { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+.field { display: grid; gap: 5px; margin-top: 12px; }
+.field > span { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.field input, .field select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-height: 46px; }
+.field input.big { font: 600 26px/1.2 var(--font-display); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg button { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 11px 8px; font-weight: 500; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+.actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 130px; }
+.moves { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.moves li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.moves .d { font-size: 12px; color: var(--muted); }
+.moves .t { overflow-wrap: anywhere; min-width: 0; }
+.moves .a { font-weight: 600; }
+.empty { text-align: center; padding: 36px 8px; color: var(--muted); }
+.empty h2 { color: var(--ink); font: 700 22px/1.2 var(--font-display); margin: 0 0 8px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 40; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; max-width: calc(100% - 32px); text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { transition: width .25s ease; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Cargando tu presupuesto…</div></div>
+<div class="dock" id="dock" hidden><button class="btn" id="fab" type="button">Añadir gasto</button></div>
+<div class="overlay" id="overlay" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="imp" accept="application/json,.json" hidden>
+
+<script>
+(function () {
+  var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
+  var S = { months: {}, key: null, ready: false, failed: false, lastRubro: null };
+  var db = null, col = null, pending = 0, chain = Promise.resolve(), toastTimer = null;
+
+  function $(s) { return document.querySelector(s); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function fmt(n) { n = Math.round(n || 0); return (n < 0 ? '−' : '') + '$' + nf.format(Math.abs(n)); }
+  function uid() { return Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function keyOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function shiftKey(k, n) { var p = k.split('-').map(Number); return keyOf(new Date(p[0], p[1] - 1 + n, 1)); }
+  function labelOf(k) { var p = k.split('-').map(Number); return MESES[p[1] - 1] + ' ' + p[0]; }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function todayISO() { var d = new Date(); return keyOf(d) + '-' + String(d.getDate()).padStart(2, '0'); }
+  function parseMoney(v) { return Number(String(v || '').replace(/\D/g, '')) || 0; }
+  function bindMoney(el) {
+    el.addEventListener('input', function () { var n = parseMoney(el.value); el.value = n ? nf.format(n) : ''; });
+  }
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+
+  /* ---------- Cálculos ---------- */
+  function calc(doc) {
+    var all = [];
+    doc.groups.forEach(function (g) { g.rubros.forEach(function (r) { all.push(r); }); });
+    var fixed = all.filter(function (r) { return r.mode !== 'rest'; }).reduce(function (a, r) { return a + (+r.budget || 0); }, 0);
+    var rests = all.filter(function (r) { return r.mode === 'rest'; });
+    var pool = doc.income - fixed;
+    var per = rests.length ? Math.max(pool, 0) / rests.length : 0;
+    var spentBy = {}, totalSpent = 0;
+    doc.entries.forEach(function (e) { spentBy[e.r] = (spentBy[e.r] || 0) + e.amt; totalSpent += e.amt; });
+    var ids = {}; all.forEach(function (r) { ids[r.id] = true; });
+    var orphan = 0; doc.entries.forEach(function (e) { if (!ids[e.r]) orphan += e.amt; });
+    var totalBudget = 0;
+    var groups = doc.groups.map(function (g) {
+      var rubros = g.rubros.map(function (r) {
+        var budget = r.mode === 'rest' ? per : (+r.budget || 0);
+        return { id: r.id, name: r.name, mode: r.mode, budget: budget, spent: spentBy[r.id] || 0 };
+      });
+      var b = 0, s = 0; rubros.forEach(function (r) { b += r.budget; s += r.spent; });
+      totalBudget += b;
+      return { id: g.id, name: g.name, rubros: rubros, budget: b, spent: s };
+    });
+    return {
+      groups: groups, income: doc.income, totalSpent: totalSpent, orphan: orphan,
+      account: doc.income - totalSpent,
+      toSpend: totalBudget - (totalSpent - orphan),
+      unassigned: doc.income - totalBudget, restCount: rests.length
+    };
+  }
+  function findRubro(doc, id) {
+    for (var i = 0; i < doc.groups.length; i++) {
+      for (var j = 0; j < doc.groups[i].rubros.length; j++) {
+        if (doc.groups[i].rubros[j].id === id) return { g: doc.groups[i], r: doc.groups[i].rubros[j] };
+      }
+    }
+    return null;
+  }
+
+  /* ---------- Persistencia ---------- */
+  var LS_KEY = 'cuentas-claras-v1', memoryOnly = false;
+  function loadAll() {
+    try { var raw = localStorage.getItem(LS_KEY); if (raw) { var o = JSON.parse(raw); if (o && o.months && typeof o.months === 'object') return o.months; } }
+    catch (e) { memoryOnly = true; }
+    return {};
+  }
+  function saveAll() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ v: 1, months: S.months })); }
+    catch (e) { memoryOnly = true; toast('Este navegador no deja guardar datos'); }
+  }
+  function persist() { saveAll(); }
+  function exportData() {
+    var blob = new Blob([JSON.stringify({ v: 1, months: S.months })], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'cuentas-claras-copia-' + todayISO() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+  function importData(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var o = JSON.parse(fr.result);
+        if (!o || typeof o.months !== 'object') throw 0;
+        Object.keys(o.months).forEach(function (k) {
+          var m = o.months[k];
+          if (!/^\d{4}-\d{2}$/.test(k) || !m || !Array.isArray(m.groups) || !Array.isArray(m.entries)) throw 0;
+        });
+        S.months = o.months; saveAll(); S.key = pickKey(); render(); toast('Copia restaurada');
+      } catch (e) { toast('Ese archivo no es una copia de Cuentas Claras'); }
+    };
+    fr.readAsText(file);
+  }
+  function dataHtml() {
+    return '<section class="group"><div class="g-head"><h2>Tus datos</h2></div>'
+      + '<p class="hint" style="margin:0 0 10px">' + (memoryOnly ? 'Este navegador no está guardando datos, así que se perderán al cerrar la página. ' : 'Tu presupuesto se guarda solo en este teléfono, sin cuenta. ')
+      + 'Descarga una copia de vez en cuando; sirve para recuperarlo o pasarlo a otro dispositivo.</p>'
+      + '<div class="actions" style="margin-top:0"><button class="btn small ghost" id="bk-exp" type="button">Descargar copia</button><button class="btn small ghost" id="bk-imp" type="button">Restaurar copia</button></div></section>';
+  }
+  function bindData() {
+    var e = $('#bk-exp'), i = $('#bk-imp');
+    if (e) e.onclick = exportData;
+    if (i) i.onclick = function () { $('#imp').click(); };
+  }
+  $('#imp').addEventListener('change', function (ev) { var f = ev.target.files && ev.target.files[0]; if (f) importData(f); ev.target.value = ''; });
+  function mutate(fn) {
+    var key = S.key, doc = clone(S.months[key]);
+    fn(doc); S.months[key] = doc; render(); persist(key);
+  }
+  function createMonth(key, fromKey, income, template) {
+    var doc;
+    if (fromKey && S.months[fromKey]) {
+      var src = S.months[fromKey];
+      doc = { income: src.income, groups: clone(src.groups), entries: [] };
+    } else {
+      doc = { income: income || 0, entries: [], groups: template === 'empty' ? [] : [
+        { id: uid(), name: 'Gastos mensuales', rubros: [] },
+        { id: uid(), name: 'Ocio y diversión', rubros: [] },
+        { id: uid(), name: 'Ahorro', rubros: [] }
+      ] };
+    }
+    S.months[key] = doc; S.key = key; render(); persist(key);
+  }
+
+  /* ---------- Vistas ---------- */
+  function render() {
+    var app = $('#app'), dock = $('#dock');
+    if (!col) {
+      dock.hidden = true;
+      app.innerHTML = '<div class="empty"><h2>No se pudo abrir tu presupuesto</h2><p>Esta página guarda tus datos en tu cuenta de Claude. Ábrela con tu sesión iniciada y con permiso para editar.</p></div>';
+      return;
+    }
+    if (!S.ready) { dock.hidden = true; return; }
+    if (!Object.keys(S.months).length) {
+      dock.hidden = true;
+      var nowKey = keyOf(new Date());
+      app.innerHTML = '<div class="empty" style="text-align:left;padding-top:28px"><h2>Arma tu presupuesto</h2>'
+        + '<p>Pon cuánto te entra al mes y decide cómo repartirlo. Los grupos, los rubros y los montos son tuyos y los puedes cambiar cuando quieras.</p>'
+        + startFormHtml(nowKey)
+        + '<div class="actions"><button class="btn" id="w-go">Crear mi presupuesto</button></div>'
+        + '<p class="hint" style="margin-top:22px">¿Ya tienes una copia guardada de otro dispositivo?</p><div class="actions" style="margin-top:6px"><button class="btn small ghost" id="bk-imp" type="button">Restaurar copia</button></div></div>';
+      bindData();
+      var st = bindStartForm();
+      $('#w-go').onclick = function () { createMonth(nowKey, null, parseMoney($('#n-amt').value), st.template()); };
+      return;
+    }
+    var key = S.key, doc = S.months[key];
+    var head = '<header class="top"><div class="month">'
+      + '<button class="icon-btn" id="prev" aria-label="Mes anterior">‹</button>'
+      + '<h1>' + esc(cap(labelOf(key))) + '</h1>'
+      + '<button class="icon-btn" id="next" aria-label="Mes siguiente">›</button></div>';
+    if (!doc) {
+      dock.hidden = true;
+      var prevKey = latestBefore(key);
+      app.innerHTML = head + '</header><div class="empty"><h2>Aún no hay presupuesto de ' + esc(labelOf(key)) + '</h2>'
+        + '<p>' + (prevKey ? 'Puedo copiar los rubros y los montos de ' + esc(labelOf(prevKey)) + ' para que solo ajustes lo que cambió.' : 'Empieza con tu ingreso del mes y arma los rubros a tu manera.') + '</p>'
+        + '<div class="actions" style="justify-content:center">'
+        + (prevKey ? '<button class="btn" id="copy">Copiar de ' + esc(labelOf(prevKey)) + '</button>' : '')
+        + '<button class="btn ' + (prevKey ? 'ghost' : '') + '" id="blank">Empezar desde cero</button></div></div>';
+      bindNav();
+      var cb = $('#copy'); if (cb) cb.onclick = function () { createMonth(key, prevKey); };
+      $('#blank').onclick = function () { sheetNewMonth(key); };
+      return;
+    }
+    var c = calc(doc);
+    var html = head
+      + '<div class="balance"><span class="lbl">En cuenta</span><span class="num' + (c.account < 0 ? ' neg' : '') + '">' + fmt(c.account) + '</span></div></header>';
+    html += '<div class="stats">'
+      + '<button class="stat" id="inc" type="button"><div class="k">Ingreso</div><div class="v">' + fmt(c.income) + '</div></button>'
+      + '<div class="stat"><div class="k">Gastado</div><div class="v">' + fmt(c.totalSpent) + '</div></div>'
+      + '<div class="stat"><div class="k">Por gastar</div><div class="v">' + fmt(c.toSpend) + '</div></div></div>';
+    if (memoryOnly) html += '<p class="note bad">Este navegador no está guardando datos. Lo que registres se perderá al cerrar la página.</p>';
+    if (c.unassigned < -0.5) html += '<p class="note bad">Los rubros suman ' + fmt(-c.unassigned) + ' más que tu ingreso. Baja algún monto o cambia un rubro a «lo que sobra».</p>';
+    else if (c.unassigned > 0.5 && !c.restCount) html += '<p class="note">Tienes ' + fmt(c.unassigned) + ' del ingreso sin asignar a ningún rubro.</p>';
+    if (c.orphan > 0.5) html += '<p class="note">Hay ' + fmt(c.orphan) + ' gastados en rubros que ya eliminaste. Siguen restando de tu cuenta.</p>';
+    c.groups.forEach(function (g) {
+      html += '<section class="group"><div class="g-head"><h2>' + esc(g.name) + '</h2>'
+        + '<span class="g-sum">' + fmt(g.spent) + ' de ' + fmt(g.budget) + '</span>'
+        + '<button class="link" data-gadj="' + g.id + '">Ajustar</button></div><div class="rubros">';
+      g.rubros.forEach(function (r) { html += rubroCard(r); });
+      html += '<button class="add-row" data-gadd="' + g.id + '">+ Añadir rubro</button></div></section>';
+    });
+    if (!c.groups.length) html += '<p class="note">Todavía no tienes grupos. Crea el primero, por ejemplo «Vivienda» o «Mercado», y dentro añade tus rubros.</p>';
+    html += '<button class="btn ghost add-group" id="addgroup">+ Añadir grupo</button>';
+    html += dataHtml();
+    app.innerHTML = html;
+    dock.hidden = false;
+    bindNav();
+    bindData();
+    $('#inc').onclick = sheetIncome;
+    $('#addgroup').onclick = function () { sheetGroup(null); };
+    app.onclick = function (ev) {
+      var b = ev.target.closest('[data-r],[data-gadj],[data-gadd]'); if (!b) return;
+      if (b.dataset.r) sheetRubro(b.dataset.r);
+      else if (b.dataset.gadj) sheetGroup(b.dataset.gadj);
+      else if (b.dataset.gadd) sheetRubroEdit(null, b.dataset.gadd);
+    };
+  }
+  function rubroCard(r) {
+    var left = r.budget - r.spent;
+    var over = left < -0.5;
+    var pct = r.budget > 0 ? Math.min(r.spent / r.budget, 1) : (r.spent > 0 ? 1 : 0);
+    var cls = over ? 'bad' : (r.budget > 0 && r.spent / r.budget >= 0.85 ? 'warn' : '');
+    return '<button class="rubro" data-r="' + r.id + '"><span class="r-top"><span class="r-name">' + esc(r.name)
+      + (r.mode === 'rest' ? '<em>lo que sobra</em>' : '') + '</span><span class="r-left' + (over ? ' neg' : '') + '">'
+      + (over ? 'Pasado ' + fmt(-left) : 'Queda ' + fmt(left)) + '</span></span>'
+      + '<span class="bar"><i class="' + cls + '" style="width:' + (pct * 100).toFixed(1) + '%"></i></span>'
+      + '<span class="r-sub">' + fmt(r.spent) + ' de ' + fmt(r.budget) + '</span></button>';
+  }
+  function latestBefore(key) {
+    var ks = Object.keys(S.months).filter(function (k) { return k < key; }).sort();
+    return ks.length ? ks[ks.length - 1] : null;
+  }
+  function bindNav() {
+    $('#prev').onclick = function () { S.key = shiftKey(S.key, -1); render(); window.scrollTo(0, 0); };
+    $('#next').onclick = function () { S.key = shiftKey(S.key, 1); render(); window.scrollTo(0, 0); };
+  }
+
+  /* ---------- Hojas ---------- */
+  function openSheet(html) {
+    $('#sheet').innerHTML = html; $('#overlay').hidden = false; $('#sheet').scrollTop = 0;
+  }
+  function closeSheet() { $('#overlay').hidden = true; $('#sheet').innerHTML = ''; }
+  $('#overlay').addEventListener('click', function (e) { if (e.target.id === 'overlay') closeSheet(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+
+  function sheetExpense(preRubro) {
+    var doc = S.months[S.key], c = calc(doc);
+    var count = c.groups.reduce(function (a, g) { return a + g.rubros.length; }, 0);
+    if (!count) {
+      openSheet('<h2>Añadir gasto</h2><p class="sub">Primero crea al menos un rubro para poder asignarle gastos.</p><div class="actions"><button class="btn ghost" id="x">Cerrar</button></div>');
+      $('#x').onclick = closeSheet; return;
+    }
+    var sel = preRubro || S.lastRubro;
+    if (!findRubro(doc, sel)) sel = c.groups.filter(function (g) { return g.rubros.length; })[0].rubros[0].id;
+    var opts = c.groups.filter(function (g) { return g.rubros.length; }).map(function (g) {
+      return '<optgroup label="' + esc(g.name) + '">' + g.rubros.map(function (r) {
+        return '<option value="' + r.id + '"' + (r.id === sel ? ' selected' : '') + '>' + esc(r.name) + ' · queda ' + fmt(r.budget - r.spent) + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    var d = todayISO(); if (d.slice(0, 7) !== S.key) d = S.key + '-01';
+    openSheet('<h2>Añadir gasto</h2><p class="sub">Se descuenta de ' + esc(labelOf(S.key)) + ' y de tu cuenta.</p>'
+      + '<label class="field"><span>Valor</span><input id="f-amt" class="big" inputmode="numeric" autocomplete="off" placeholder="0"></label>'
+      + '<label class="field"><span>Rubro</span><select id="f-r">' + opts + '</select></label>'
+      + '<label class="field"><span>Nota (opcional)</span><input id="f-note" maxlength="80" autocomplete="off" placeholder="Ej. Mercado D1"></label>'
+      + '<label class="field"><span>Fecha</span><input id="f-date" type="date" value="' + d + '"></label>'
+      + '<div class="actions"><button class="btn ghost" id="f-cancel">Cancelar</button><button class="btn" id="f-save">Guardar gasto</button></div>');
+    bindMoney($('#f-amt'));
+    setTimeout(function () { var a = $('#f-amt'); if (a) a.focus(); }, 60);
+    $('#f-cancel').onclick = closeSheet;
+    $('#f-save').onclick = function () {
+      var amt = parseMoney($('#f-amt').value);
+      if (!amt) { $('#f-amt').focus(); toast('Escribe el valor del gasto'); return; }
+      var rid = $('#f-r').value, note = $('#f-note').value.trim(), date = $('#f-date').value || d;
+      S.lastRubro = rid;
+      mutate(function (m) { m.entries.push({ id: uid(), r: rid, amt: amt, note: note, d: date }); });
+      closeSheet();
+      var after = calc(S.months[S.key]);
+      var found = null; after.groups.forEach(function (g) { g.rubros.forEach(function (r) { if (r.id === rid) found = r; }); });
+      if (found) toast(found.name + ': ' + (found.budget - found.spent < -0.5 ? 'te pasaste ' + fmt(found.spent - found.budget) : 'quedan ' + fmt(found.budget - found.spent)));
+    };
+  }
+
+  function sheetRubro(id) {
+    var doc = S.months[S.key], c = calc(doc), f = null;
+    c.groups.forEach(function (g) { g.rubros.forEach(function (r) { if (r.id === id) f = { g: g, r: r }; }); });
+    if (!f) return;
+    var moves = doc.entries.filter(function (e) { return e.r === id; }).sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : 0; });
+    var left = f.r.budget - f.r.spent;
+    var list = moves.length ? '<ul class="moves">' + moves.map(function (e) {
+      var p = e.d.split('-');
+      return '<li><div class="t"><div>' + (e.note ? esc(e.note) : 'Sin nota') + '</div><div class="d">' + Number(p[2]) + ' ' + MESES[Number(p[1]) - 1].slice(0, 3) + '</div></div>'
+        + '<span class="a">' + fmt(e.amt) + '</span><button class="link" data-del="' + e.id + '">Borrar</button></li>';
+    }).join('') + '</ul>' : '<p class="hint">Todavía no hay gastos en este rubro.</p>';
+    openSheet('<h2>' + esc(f.r.name) + '</h2><p class="sub">' + fmt(f.r.spent) + ' de ' + fmt(f.r.budget) + ' · '
+      + (left < -0.5 ? 'te pasaste ' + fmt(-left) : 'queda ' + fmt(left)) + '</p>'
+      + '<div class="actions" style="margin-top:0"><button class="btn small" id="m-add">Añadir gasto aquí</button><button class="btn small ghost" id="m-edit">Editar rubro</button></div>'
+      + list + '<div class="actions"><button class="btn ghost" id="m-close">Cerrar</button></div>');
+    $('#m-close').onclick = closeSheet;
+    $('#m-add').onclick = function () { sheetExpense(id); };
+    $('#m-edit').onclick = function () { sheetRubroEdit(id, f.g.id); };
+    $('#sheet').onclick = function (ev) {
+      var b = ev.target.closest('[data-del]'); if (!b) return;
+      if (b.dataset.armed) {
+        mutate(function (m) { m.entries = m.entries.filter(function (e) { return e.id !== b.dataset.del; }); });
+        sheetRubro(id);
+      } else { b.dataset.armed = '1'; b.textContent = '¿Seguro?'; b.style.color = 'var(--bad)'; }
+    };
+  }
+
+  function sheetRubroEdit(id, groupId) {
+    var doc = S.months[S.key], found = id ? findRubro(doc, id) : null;
+    var r = found ? found.r : { name: '', mode: 'fixed', budget: 0 };
+    var mode = r.mode === 'rest' ? 'rest' : 'fixed';
+    openSheet('<h2>' + (found ? 'Editar rubro' : 'Nuevo rubro') + '</h2><p class="sub">Los cambios aplican solo a ' + esc(labelOf(S.key)) + '.</p>'
+      + '<label class="field"><span>Nombre</span><input id="e-name" maxlength="40" autocomplete="off" value="' + esc(r.name) + '" placeholder="Ej. Arriendo"></label>'
+      + '<div class="field"><span>Cómo se define el monto</span><div class="seg"><button type="button" id="m-fixed" aria-pressed="' + (mode === 'fixed') + '">Monto fijo</button><button type="button" id="m-rest" aria-pressed="' + (mode === 'rest') + '">Lo que sobra</button></div></div>'
+      + '<label class="field" id="e-budget-wrap"><span>Monto del mes</span><input id="e-budget" inputmode="numeric" autocomplete="off" value="' + (r.budget ? nf.format(r.budget) : '') + '" placeholder="0"></label>'
+      + '<p class="hint" id="e-hint"></p>'
+      + '<div class="actions"><button class="btn ghost" id="e-cancel">Cancelar</button><button class="btn" id="e-save">Guardar</button></div>'
+      + (found ? '<div class="actions"><button class="btn danger" id="e-del">Eliminar rubro</button></div>' : ''));
+    bindMoney($('#e-budget'));
+    function paint() {
+      $('#m-fixed').setAttribute('aria-pressed', mode === 'fixed'); $('#m-rest').setAttribute('aria-pressed', mode === 'rest');
+      $('#e-budget-wrap').hidden = mode === 'rest';
+      $('#e-hint').textContent = mode === 'rest'
+        ? 'Recibe lo que queda del ingreso después de todos los rubros de monto fijo. Si marcas varios, se reparte en partes iguales.'
+        : '';
+    }
+    paint();
+    $('#m-fixed').onclick = function () { mode = 'fixed'; paint(); };
+    $('#m-rest').onclick = function () { mode = 'rest'; paint(); };
+    $('#e-cancel').onclick = function () { found ? sheetRubro(id) : closeSheet(); };
+    $('#e-save').onclick = function () {
+      var name = $('#e-name').value.trim(); if (!name) { $('#e-name').focus(); toast('Ponle un nombre al rubro'); return; }
+      var budget = parseMoney($('#e-budget').value);
+      mutate(function (m) {
+        if (found) { var x = findRubro(m, id).r; x.name = name; x.mode = mode; x.budget = mode === 'rest' ? 0 : budget; }
+        else { m.groups.filter(function (g) { return g.id === groupId; })[0].rubros.push({ id: uid(), name: name, mode: mode, budget: mode === 'rest' ? 0 : budget }); }
+      });
+      closeSheet();
+    };
+    if (found) {
+      $('#e-del').onclick = function () {
+        var b = $('#e-del');
+        if (!b.dataset.armed) {
+          var n = doc.entries.filter(function (e) { return e.r === id; }).length;
+          b.dataset.armed = '1'; b.textContent = n ? 'Confirmar (' + n + ' gastos seguirán restando de tu cuenta)' : 'Confirmar eliminación'; return;
+        }
+        mutate(function (m) { m.groups.forEach(function (g) { g.rubros = g.rubros.filter(function (x) { return x.id !== id; }); }); });
+        closeSheet();
+      };
+    }
+  }
+
+  function sheetGroup(id) {
+    var doc = S.months[S.key], g = id ? doc.groups.filter(function (x) { return x.id === id; })[0] : null;
+    openSheet('<h2>' + (g ? 'Ajustar grupo' : 'Nuevo grupo') + '</h2><p class="sub">Un grupo junta rubros parecidos, como «Gastos mensuales» u «Ocio».</p>'
+      + '<label class="field"><span>Nombre</span><input id="g-name" maxlength="40" autocomplete="off" value="' + (g ? esc(g.name) : '') + '" placeholder="Ej. Vivienda"></label>'
+      + '<div class="actions"><button class="btn ghost" id="g-cancel">Cancelar</button><button class="btn" id="g-save">Guardar</button></div>'
+      + (g ? '<div class="actions"><button class="btn ghost" id="g-add">Añadir rubro</button><button class="btn danger" id="g-del">Eliminar grupo</button></div>' : ''));
+    $('#g-cancel').onclick = closeSheet;
+    $('#g-save').onclick = function () {
+      var name = $('#g-name').value.trim(); if (!name) { $('#g-name').focus(); toast('Ponle un nombre al grupo'); return; }
+      mutate(function (m) {
+        if (g) m.groups.filter(function (x) { return x.id === id; })[0].name = name;
+        else m.groups.push({ id: uid(), name: name, rubros: [] });
+      });
+      closeSheet();
+    };
+    if (g) {
+      $('#g-add').onclick = function () { sheetRubroEdit(null, id); };
+      $('#g-del').onclick = function () {
+        var b = $('#g-del');
+        if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Confirmar (se quitan sus ' + g.rubros.length + ' rubros)'; return; }
+        mutate(function (m) { m.groups = m.groups.filter(function (x) { return x.id !== id; }); });
+        closeSheet();
+      };
+    }
+  }
+
+  function sheetIncome() {
+    var doc = S.months[S.key];
+    openSheet('<h2>Ingreso del mes</h2><p class="sub">Los rubros marcados como «lo que sobra» se recalculan solos con este valor.</p>'
+      + '<label class="field"><span>Ingreso de ' + esc(labelOf(S.key)) + '</span><input id="i-amt" class="big" inputmode="numeric" autocomplete="off" value="' + nf.format(doc.income) + '"></label>'
+      + '<div class="actions"><button class="btn ghost" id="i-cancel">Cancelar</button><button class="btn" id="i-save">Guardar</button></div>');
+    bindMoney($('#i-amt'));
+    $('#i-cancel').onclick = closeSheet;
+    $('#i-save').onclick = function () { var v = parseMoney($('#i-amt').value); mutate(function (m) { m.income = v; }); closeSheet(); };
+  }
+
+  function startFormHtml(key) {
+    return '<label class="field"><span>Ingreso de ' + esc(labelOf(key)) + '</span><input id="n-amt" class="big" inputmode="numeric" autocomplete="off" placeholder="0"></label>'
+      + '<div class="field"><span>Punto de partida</span><div class="seg"><button type="button" id="t-basic" aria-pressed="true">Tres grupos</button><button type="button" id="t-empty" aria-pressed="false">Todo vacío</button></div></div>'
+      + '<p class="hint" id="t-hint"></p>';
+  }
+  function bindStartForm() {
+    var tpl = 'basic';
+    bindMoney($('#n-amt'));
+    function paint() {
+      $('#t-basic').setAttribute('aria-pressed', tpl === 'basic'); $('#t-empty').setAttribute('aria-pressed', tpl === 'empty');
+      $('#t-hint').textContent = tpl === 'basic'
+        ? 'Crea «Gastos mensuales», «Ocio y diversión» y «Ahorro» sin rubros, para que añadas los tuyos.'
+        : 'No crea nada: tú pones los grupos y rubros que quieras, con los nombres que quieras.';
+    }
+    paint();
+    $('#t-basic').onclick = function () { tpl = 'basic'; paint(); };
+    $('#t-empty').onclick = function () { tpl = 'empty'; paint(); };
+    return { template: function () { return tpl; } };
+  }
+  function sheetNewMonth(key) {
+    openSheet('<h2>Nuevo mes</h2><p class="sub">Arma ' + esc(labelOf(key)) + ' desde cero. Después puedes cambiar todo.</p>'
+      + startFormHtml(key)
+      + '<div class="actions"><button class="btn ghost" id="n-cancel">Cancelar</button><button class="btn" id="n-save">Crear mes</button></div>');
+    var st = bindStartForm();
+    setTimeout(function () { var a = $('#n-amt'); if (a) a.focus(); }, 60);
+    $('#n-cancel').onclick = closeSheet;
+    $('#n-save').onclick = function () { var v = parseMoney($('#n-amt').value); closeSheet(); createMonth(key, null, v, st.template()); };
+  }
+
+  $('#fab').onclick = function () { sheetExpense(null); };
+
+  /* ---------- Arranque ---------- */
+  function pickKey() {
+    var now = keyOf(new Date()), ks = Object.keys(S.months).sort();
+    if (S.months[now]) return now;
+    return ks.length ? ks[ks.length - 1] : now;
+  }
+  col = true;
+  S.months = loadAll();
+  S.ready = true;
+  S.key = pickKey();
+  render();
+})();
+</script>
+</body>
+</html>
